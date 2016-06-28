@@ -1,25 +1,135 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research Project 1"
+author: "Lucas"
+date: "June 28, 2016"
+output: html_document
 ---
 
+*criterion 1*  
+Required packages are loaded, working directories are selected and files downloaded, unzipped and read into R.
 
-## Loading and preprocessing the data
+```{r, message=FALSE}
+library(ggplot2)
+library(dplyr)
 
+workdir <- "~/Documents/Courses/Data specialization Johns Hopkins/05_Reproducible Research/week 2/project_1/"
+setwd(workdir)
 
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", "data.zip")
+unzip("data.zip")
+activity <- read.csv("activity.csv")
+```
 
-## What is mean total number of steps taken per day?
+*criterion 1*  
+**Variable recoding** is performed to create a separate dataset (called "perday") that holds the numbers of steps per day.
 
+```{r}
 
+#recode into steps / day
+days <- as.character(unique(activity$date))
+stepsperday <- c()
+for(i in seq_along(days)) {
+  stepsperday <- c(stepsperday, sum(activity[which(activity$date ==days[i]), 1], na.rm = TRUE))
+}
+perday <- data.frame(cbind(days, stepsperday))
+perday$days <- as.POSIXct(perday$days)
+perday$stepsperday <- as.numeric(as.character(perday$stepsperday))
 
-## What is the average daily activity pattern?
+```
 
+*criterion 2*  
+A **histogram with counts of steps per day** (with bins of 1000 steps) is created.
 
+```{r}
 
-## Imputing missing values
+#histogram
+hist <- ggplot(data = perday, aes(stepsperday))
+hist + geom_histogram(binwidth = 1000)
 
+```
 
+*criterion 3*  
+The **mean and median** of steps per day are calculated
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+
+#mean and median
+meansteps <- mean(perday$stepsperday, na.rm = TRUE)
+mediansteps <- median(perday$stepsperday, na.rm = TRUE)
+meansteps
+mediansteps
+
+```
+
+*criterion 4*  
+A **timeseries** of steps per day is created.
+
+```{r}
+
+#timeseries
+time <- ggplot(data = activity, aes(x = interval, y = steps))
+time + stat_summary(fun.y="mean", geom="line") + ggtitle("average steps per interval")
+
+```
+
+*criterion 5*  
+The **interval that contains the maximum number of steps* is identified
+
+```{r}
+
+#interval with max steps
+activity[which(activity$steps == max(activity$steps, na.rm = TRUE)), 2:3]
+
+```
+
+*criterion 6*  
+The number of NA values for number of steps per interval in the dataset is shown. strategy for **imputing missing data** (steps per interval) with the mean of steps per interval is shown below and implemented. This strategy is implemented on the raw dataset which is then used to recreated the steps per day dataset with missing datafields replaced (stepsperday_new)
+
+```{r}
+
+#count NAs
+length(activity[which(is.na(activity$steps)), 1])
+
+#imputation of the sample mean at missing data points on the raw (=steps per interval) data
+meansteps_interval <- mean(activity$steps, na.rm = TRUE)
+activity[is.na(activity$steps), 1] <- meansteps_interval
+
+#creating new dataset of steps per day with imputed datapoints
+stepsperday_new <- c()
+for(i in seq_along(days)) {
+  stepsperday_new <- c(stepsperday_new, sum(activity[which(activity$date == days[i]), 1], na.rm = TRUE))
+}
+perday_new <- data.frame(cbind(days, stepsperday_new))
+perday_new$days <- as.POSIXct(perday_new$days)
+perday_new$stepsperday_new <- as.numeric(as.character(perday_new$stepsperday_new))
+
+```
+
+*criterion 7*  
+A **histogram** of the steps per day data after the imputation is made.
+
+```{r}
+
+#histogram
+hist_new <- ggplot(data = perday_new, aes(stepsperday_new))
+hist_new + geom_histogram(binwidth = 1000)
+
+```
+
+*criterion 8*  
+A **timeseries panel plot** is created to show the difference in average of mean steps per 5 minute interval between weekdays and weekend days.
+
+```{r}
+
+#create panel plot for weekdays vs weekends
+activity$date <- as.POSIXct(activity$date)
+activity <- mutate(activity, weekday = weekdays(date))
+activity <- mutate(activity, workday = "weekday")
+activity[which(activity$weekday == "Saturday" | activity$weekday == "Sunday"), 5] <- "weekend day"
+activity$workday <- as.factor(activity$workday)
+
+time2 <- ggplot(data = activity, aes(x = interval, y = steps))
+time2 + stat_summary(fun.y="mean", geom="line") + facet_grid(. ~ workday)  + ggtitle("average steps per interval")
+
+```
+
